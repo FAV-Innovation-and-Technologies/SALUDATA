@@ -1,0 +1,10 @@
+{
+  "resourceType": "AllergyIntolerance",
+  "id": "synthetic-allergy-001",
+  "patient": {
+    "reference": "Patient/synthetic-patient-001"
+  },
+  "code": {
+    "text": "Synthetic test allergy \u2014 not a clinical record"
+  }
+}

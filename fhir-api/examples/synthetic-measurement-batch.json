@@ -1,0 +1,37 @@
+{
+  "schema_version": "saludata.measurement-batch.v1",
+  "batch_id": "batch_example_0001",
+  "events": [
+    {
+      "schema_version": "saludata.measurement-event.v1",
+      "event_id": "evt_example_0001",
+      "event_type": "measurement.recorded",
+      "correlation_id": "corr_example_0001",
+      "patient_ref": "pt_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "device_ref": "dev_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "occurred_at": "2026-01-01T12:00:00Z",
+      "produced_at": "2026-01-01T12:00:01Z",
+      "source": {
+        "kind": "smart_ring",
+        "transport": "synthetic",
+        "manufacturer_code": "SYNTH_RING",
+        "firmware_ref": "fw_example_0001"
+      },
+      "measurements": [
+        {
+          "code": "heart_rate",
+          "value": 72,
+          "unit": "beats/min",
+          "quality": {
+            "status": "good",
+            "score": 0.99,
+            "artifact_codes": []
+          }
+        }
+      ],
+      "synthetic": true,
+      "mode": "shadow",
+      "clinical_use": false
+    }
+  ]
+}

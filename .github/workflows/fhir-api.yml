@@ -1,0 +1,53 @@
+name: FHIR API
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: fhir-api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: fhir-api/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npm run check
+      - run: npm audit --omit=dev --audit-level=high
+      - name: Audit ingestion runtime
+        run: |
+          mkdir -p .step1-lock-check
+          cp package.step1.json .step1-lock-check/package.json
+          cp package-lock.step1.json .step1-lock-check/package-lock.json
+          cd .step1-lock-check
+          npm audit --omit=dev --audit-level=high
+
+  integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: fhir-api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: fhir-api/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npm run test:integration
+      - name: Build ingestion image
+        run: docker build -f Dockerfile -t saludata-ingestion:check .

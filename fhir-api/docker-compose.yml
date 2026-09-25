@@ -1,0 +1,29 @@
+services:
+  fhir:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    env_file: .env
+    environment:
+      MONGO_HOSTNAME: mongo
+      MONGO_USERNAME: ""
+      MONGO_PASSWORD: ""
+      KAFKA_ENABLED: "false"
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      mongo:
+        condition: service_healthy
+  mongo:
+    image: mongo:7.0.14
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    ports:
+      - "127.0.0.1:27017:27017"
+    volumes:
+      - mongo_data:/data/db
+volumes:
+  mongo_data:

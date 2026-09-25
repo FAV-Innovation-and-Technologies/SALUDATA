@@ -1,0 +1,13 @@
+{
+  "name": "saludata-step1-ingestion",
+  "version": "1.0.0",
+  "private": true,
+  "license": "MIT",
+  "dependencies": {
+    "dotenv": "17.4.2",
+    "express": "4.22.3",
+    "helmet": "7.2.0",
+    "kafkajs": "2.2.4",
+    "mongodb": "7.5.0"
+  }
+}

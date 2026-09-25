@@ -1,0 +1,37 @@
+services:
+  fhir:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    environment:
+      MONGO_HOSTNAME: mongo
+      MONGO_DB_NAME: fhir_integration
+      MONGO_TLS: "false"
+      SERVER_PORT: "3000"
+      FHIR_AUTH_ENABLED: "false"
+      FHIR_LEGACY_ENDPOINTS_ENABLED: "false"
+      WHITELIST: http://127.0.0.1
+      KAFKA_ENABLED: "false"
+      MONITORING_INGESTION_MODE: synthetic
+      MONITORING_KAFKA_PUBLISHING_ENABLED: "false"
+      MONITORING_SYNTHETIC_AUTH_REQUIRED: "false"
+      LOGGING_LEVEL: warn
+    depends_on:
+      mongo:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${FHIR_TEST_PORT:-3001}:3000"
+
+  mongo:
+    image: mongo:7.0.14
+    healthcheck:
+      test:
+        ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    volumes:
+      - mongo_data:/data/db
+
+volumes:
+  mongo_data:

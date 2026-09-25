@@ -1,0 +1,178 @@
+# Opt-in Step-1 supply-chain pipeline. Existing production build/deploy jobs are
+# intentionally untouched and this template never deploys to Kubernetes.
+stages:
+  - test
+  - build
+  - deploy
+
+variables:
+  STEP1_IMAGE_REPOSITORY: "$CI_REGISTRY_IMAGE/step1-ingestion"
+  STEP1_DOCKERFILE: "Dockerfile"
+  STEP1_PLATFORMS: "linux/amd64,linux/arm64"
+
+.step1_verify:
+  interruptible: true
+  rules:
+    - if: '$STEP1_CI_ENABLED == "true" && $CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$STEP1_CI_ENABLED == "true" && $CI_COMMIT_REF_PROTECTED == "true"'
+    - when: never
+
+.step1_publish:
+  interruptible: false
+  tags:
+    - step1-multiarch-protected
+  rules:
+    - if: '$STEP1_CI_ENABLED == "true" && $STEP1_PUBLISH_IMAGES == "true" && $STEP1_BUILDER_TRUSTED == "true" && $CI_COMMIT_REF_PROTECTED == "true"'
+    - when: never
+
+"step1:verify":
+  extends: .step1_verify
+  image:
+    name: "node:24.19.0-alpine@sha256:d32cdf619f63fe0471182d08996dd516c6275bb5fd31ae06e55a570bd9e1ad43"
+    entrypoint: [""]
+  # .pre is always available, even though the production root pipeline only
+  # declares build/deploy. This preserves that stage list and orders this job
+  # before both the existing build and the opt-in image build.
+  stage: .pre
+  script:
+    - mkdir -p artifacts
+    - node --version | grep -F 'v24.19.0'
+    - mkdir -p .step1-lock-check
+    - cp package.step1.json .step1-lock-check/package.json
+    - cd .step1-lock-check && npm install --package-lock-only --ignore-scripts --no-audit --no-fund && cd ..
+    - cmp package-lock.step1.json .step1-lock-check/package-lock.json
+    - npm ci --no-audit --no-fund
+    - git diff --exit-code -- package.json package-lock.json package.step1.json package-lock.step1.json
+    - node ci/step1/validate_ci.js
+    - node --check src/step1-ingestion.js
+    - node --check src/step1-app.js
+    - node --check src/routes/measurement-ingestion.js
+    - ./node_modules/.bin/eslint src/step1-ingestion.js src/step1-app.js src/routes/measurement-ingestion.js src/monitoring/*.js src/lib/kafka-manager.js tests/step1-ingestion.test.js tests/step1-app.test.js tests/step1-ci-template.test.js tests/measurement-ingestion.test.js tests/measurement-consumer-parity.test.js tests/mongo-config.test.js tests/kafka-security.test.js
+    - npm run test:jest -- --runInBand --json --outputFile=artifacts/jest-results.json
+  artifacts:
+    when: always
+    expire_in: 30 days
+    paths:
+      - artifacts/jest-results.json
+
+"step1:build-image":
+  extends: .step1_publish
+  image:
+    name: "docker:27.5.1-cli@sha256:851f91d241214e7c6db86513b270d58776379aacc5eb9c4a87e5b47115e3065c"
+    entrypoint: [""]
+  services:
+    - name: "docker:27.5.1-dind@sha256:aa3df78ecf320f5fafdce71c659f1629e96e9de0968305fe1de670e0ca9176ce"
+      alias: docker
+  stage: build
+  needs:
+    - job: "step1:verify"
+      artifacts: false
+  variables:
+    DOCKER_HOST: "tcp://docker:2376"
+    DOCKER_TLS_CERTDIR: "/certs"
+    DOCKER_TLS_VERIFY: "1"
+    DOCKER_CERT_PATH: "/certs/client"
+    BUILDKIT_PROGRESS: plain
+  script:
+    - |
+      set -eu
+      : "${CI_REGISTRY:?CI_REGISTRY is required}"
+      : "${CI_REGISTRY_IMAGE:?CI_REGISTRY_IMAGE is required}"
+      : "${CI_REGISTRY_USER:?CI_REGISTRY_USER is required}"
+      : "${CI_REGISTRY_PASSWORD:?CI_REGISTRY_PASSWORD is required}"
+      [ "${CI_COMMIT_REF_PROTECTED:-false}" = "true" ]
+      [ "${STEP1_PUBLISH_IMAGES:-false}" = "true" ]
+      [ "${STEP1_BUILDER_TRUSTED:-false}" = "true" ]
+      [ "$STEP1_DOCKERFILE" = "Dockerfile" ]
+      [ "$STEP1_PLATFORMS" = "linux/amd64,linux/arm64" ]
+      case "$STEP1_IMAGE_REPOSITORY" in
+        "$CI_REGISTRY_IMAGE"/*) ;;
+        *) echo "STEP1_IMAGE_REPOSITORY must remain below CI_REGISTRY_IMAGE" >&2; exit 1 ;;
+      esac
+      mkdir -p artifacts
+      printf '%s' "$CI_REGISTRY_PASSWORD" | docker login "$CI_REGISTRY" --username "$CI_REGISTRY_USER" --password-stdin
+      docker info > artifacts/docker-info.txt
+      docker run --privileged --rm "tonistiigi/binfmt:qemu-v8.1.5@sha256:2d2918e86e5327d0661f7083d67a95280b0f7be8f77ed79a8418f81d7d90ce6f" --install arm64
+      builder="step1-${CI_PIPELINE_ID}-${CI_JOB_ID}"
+      trap 'docker buildx rm "$builder" >/dev/null 2>&1 || true; docker logout "$CI_REGISTRY" >/dev/null 2>&1 || true' EXIT
+      docker buildx create --name "$builder" --driver docker-container --use
+      docker buildx inspect --bootstrap | tee artifacts/buildx-inspect.txt
+      grep -Eq 'linux/amd64' artifacts/buildx-inspect.txt
+      grep -Eq 'linux/arm64' artifacts/buildx-inspect.txt
+      image_tag="${STEP1_IMAGE_REPOSITORY}:step1-${CI_PIPELINE_ID}-${CI_JOB_ID}"
+      docker buildx build \
+        --pull \
+        --platform "$STEP1_PLATFORMS" \
+        --file "$STEP1_DOCKERFILE" \
+        --label "org.opencontainers.image.source=$CI_PROJECT_URL" \
+        --label "org.opencontainers.image.revision=$CI_COMMIT_SHA" \
+        --provenance=mode=max \
+        --sbom=true \
+        --metadata-file artifacts/build-metadata.json \
+        --tag "$image_tag" \
+        --push \
+        .
+      digest="$(sed -n 's/.*"containerimage.digest":[[:space:]]*"\(sha256:[a-f0-9]\{64\}\)".*/\1/p' artifacts/build-metadata.json | head -n 1)"
+      printf '%s\n' "$digest" | grep -Eq '^sha256:[a-f0-9]{64}$'
+      immutable_ref="${STEP1_IMAGE_REPOSITORY}@${digest}"
+      docker buildx imagetools inspect "$immutable_ref" > artifacts/manifest.txt
+      grep -Eq 'Platform:[[:space:]]+linux/amd64' artifacts/manifest.txt
+      grep -Eq 'Platform:[[:space:]]+linux/arm64' artifacts/manifest.txt
+      printf 'STEP1_IMAGE=%s\nSTEP1_FHIR_IMAGE=%s\nSTEP1_IMAGE_DIGEST=%s\n' \
+        "$immutable_ref" "$immutable_ref" "$digest" > artifacts/step1-image.env
+  artifacts:
+    expire_in: 30 days
+    paths:
+      - artifacts/build-metadata.json
+      - artifacts/buildx-inspect.txt
+      - artifacts/docker-info.txt
+      - artifacts/manifest.txt
+      - artifacts/step1-image.env
+    reports:
+      dotenv: artifacts/step1-image.env
+
+"step1:image-scan":
+  extends: .step1_publish
+  image:
+    name: "aquasec/trivy:0.65.0@sha256:a22415a38938a56c379387a8163fcb0ce38b10ace73e593475d3658d578b2436"
+    entrypoint: [""]
+  stage: deploy
+  needs:
+    - job: "step1:build-image"
+      artifacts: true
+  variables:
+    GIT_STRATEGY: none
+    TRIVY_CACHE_DIR: "/tmp/trivy-cache"
+    TRIVY_NO_PROGRESS: "true"
+  script:
+    - |
+      set -eu
+      : "${STEP1_IMAGE:?digest-qualified STEP1_IMAGE artifact is required}"
+      : "${CI_REGISTRY_USER:?CI_REGISTRY_USER is required}"
+      : "${CI_REGISTRY_PASSWORD:?CI_REGISTRY_PASSWORD is required}"
+      printf '%s\n' "$STEP1_IMAGE" | grep -Eq '^.+@sha256:[a-f0-9]{64}$'
+      case "$STEP1_IMAGE" in
+        "$CI_REGISTRY_IMAGE"/*@sha256:*) ;;
+        *) echo "refusing to scan an image outside CI_REGISTRY_IMAGE" >&2; exit 1 ;;
+      esac
+      mkdir -p artifacts
+      export TRIVY_USERNAME="$CI_REGISTRY_USER"
+      export TRIVY_PASSWORD="$CI_REGISTRY_PASSWORD"
+      trivy image --platform linux/amd64 --scanners vuln --format cyclonedx --output artifacts/step1-amd64.cdx.json "$STEP1_IMAGE"
+      trivy image --platform linux/arm64 --scanners vuln --format cyclonedx --output artifacts/step1-arm64.cdx.json "$STEP1_IMAGE"
+      trivy image --platform linux/amd64 --scanners vuln --format template --template '@/contrib/gitlab.tpl' --output artifacts/gl-container-scanning-report.json "$STEP1_IMAGE"
+      scan_status=0
+      trivy image --platform linux/amd64 --scanners vuln --severity HIGH,CRITICAL --exit-code 1 --format json --output artifacts/trivy-amd64.json "$STEP1_IMAGE" || scan_status=1
+      trivy image --platform linux/arm64 --scanners vuln --severity HIGH,CRITICAL --exit-code 1 --format json --output artifacts/trivy-arm64.json "$STEP1_IMAGE" || scan_status=1
+      exit "$scan_status"
+  artifacts:
+    when: always
+    expire_in: 30 days
+    paths:
+      - artifacts/step1-amd64.cdx.json
+      - artifacts/step1-arm64.cdx.json
+      - artifacts/trivy-amd64.json
+      - artifacts/trivy-arm64.json
+      - artifacts/gl-container-scanning-report.json
+    reports:
+      container_scanning: artifacts/gl-container-scanning-report.json

@@ -1,0 +1,14 @@
+SALUDATA FHIR API
+
+Derived from BlueHalo/node-fhir-server-mongo:
+https://github.com/BlueHalo/node-fhir-server-mongo
+Original license: MIT. Original copyright: Copyright (c) 2016 Robert.
+Original contributors listed in package.json are retained.
+
+SALUDATA modifications include Kafka integration, measurement and sports ECG
+ ingestion, authentication integration, and container hardening.
+Copyright (c) 2026 SALUDATA contributors.
+
+Third-party packages remain under their respective licenses. This project does
+not claim ownership of HL7 FHIR, LOINC, SNOMED CT, UCUM or other terminologies.
+Their identifiers in source code do not grant rights to terminology datasets.
