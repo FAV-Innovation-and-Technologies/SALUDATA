@@ -1,5 +1,8 @@
 <p align="center">
-  <img src="docs/saludata-logo.png" alt="SALUDATA" width="360">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/saludata-logo-dark.png">
+    <img src="docs/saludata-logo.png" alt="SALUDATA" width="360">
+  </picture>
 </p>
 
 # SALUDATA
