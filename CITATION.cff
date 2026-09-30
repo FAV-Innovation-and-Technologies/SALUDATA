@@ -1,0 +1,31 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "SALUDATA: health-data interoperability and synthetic monitoring tools"
+version: 0.1.0
+license: MIT
+repository-code: "https://github.com/FAV-Innovation-and-Technologies/SALUDATA"
+authors:
+  - family-names: "Pérez Carrasco"
+    given-names: "Francisco José"
+    affiliation: "FAV Innovation and Technologies Coop. V. (FAVIT)"
+  - family-names: "García"
+    given-names: "Alberto"
+    affiliation: "FAV Innovation and Technologies Coop. V. (FAVIT)"
+  - family-names: "Robles Pérez"
+    given-names: "Débora"
+    affiliation: "FAV Innovation and Technologies Coop. V. (FAVIT)"
+  - family-names: "Navarro"
+    given-names: "Eliot"
+    affiliation: "FAV Innovation and Technologies Coop. V. (FAVIT)"
+keywords:
+  - FHIR
+  - remote patient monitoring
+  - synthetic health data
+  - digital health
+references:
+  - type: dataset
+    title: "SALUDATA Synthetic Remote Monitoring Dataset"
+    version: 0.1.0
+    doi: "10.5281/zenodo.23057595"
+    authors:
+      - name: "FAV Innovation and Technologies Coop. V."
