@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/saludata-logo.png" alt="SALUDATA" width="360">
+</p>
+
 # SALUDATA
 
 Tools for health-data interoperability and synthetic monitoring workflows, released as open source by the **SALUDATA** project (*Plataforma para el seguimiento integral de pacientes con un sistema de alertas predictivo*), developed by FAV Innovation and Technologies Coop. V. (FAVIT).
