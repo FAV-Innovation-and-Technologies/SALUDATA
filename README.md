@@ -80,3 +80,11 @@ Francisco José Pérez Carrasco — fperez@favit.es
 ## License
 
 [MIT](LICENSE). Preserve the license and copyright notices when redistributing the code. Upstream attribution is retained in [`fhir-api/NOTICE`](fhir-api/NOTICE).
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/logos-financiacion.jpg">
+    <img src="docs/saludata-logo.png" alt="SALUDATA" width="360">
+  </picture>
+</p>
+
