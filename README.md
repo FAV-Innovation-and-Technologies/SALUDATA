@@ -84,7 +84,7 @@ Francisco José Pérez Carrasco — fperez@favit.es
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/logos-financiacion.jpg">
-    <img src="docs/saludata-logo.png" alt="SALUDATA" width="360">
+    <img src="docs/logos-financiacion.jpg" alt="SALUDATA" width="360">
   </picture>
 </p>
 
